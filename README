@@ -1,0 +1,45 @@
+ERP DB Copy
+===========
+
+Clone a Tryton or OpenERP database to new database (add _copia).
+
+Installing
+----------
+
+See INSTALL
+
+Package Contents
+----------------
+
+  bin/
+      Program.
+
+  erpdbcopy/
+      ERP DB Copy sources.
+
+License
+-------
+
+See LICENSE
+
+Copyright
+---------
+
+See COPYRIGHT
+
+Example to use
+--------------
+
+    $ erpdbcopy -u user -p password -d dbname -s server -e trytond
+
+Server option is optional. If don't use it, get name from dbname
+
+Example crontab
+---------------
+
+    30 1 * * * /usr/local/bin/erpdbcopy -u user -p password -d dbname -s server -e trytond
+
+Log file
+--------
+
+    /var/log/erpdbcopy.log

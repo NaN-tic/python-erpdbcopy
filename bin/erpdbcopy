@@ -1,0 +1,100 @@
+#This file is part of ERP DB Copy. The COPYRIGHT file at the top level of
+#this repository contains the full copyright notices and license terms.
+import sys
+import os
+import optparse
+import subprocess
+import logging
+from psycopg2 import connect
+
+from erpdbcopy import version
+
+LOG = '/var/log/erpdbcopy.log'
+
+def create_db_copy(server, user, password, dbname, port=5432, erp='trytond'):
+    """Create new database_copia"""
+
+    logging.basicConfig(format='%(asctime)s %(message)s', 
+        filename=LOG, level=logging.INFO)
+
+    logging.basicConfig(format='%(asctime)s %(message)s', 
+        filename=LOG, level=logging.INFO)
+
+    logging.info('Start copy database: %s' % dbname)
+
+    logging.info('Stop jasper server: %s' % dbname)
+    os.system("kill -9 `ps -ef | grep 'jasperreports' | grep 'JasperServer' | grep '8090' | awk {'print $2'}`")
+
+    logging.info('Stop server: %s' % dbname)
+    os.system('/etc/init.d/%s stop %s' % (erp, server))
+
+    logging.info('Create db copy: %s' % dbname)
+    process = subprocess.Popen("""
+        export PGPASSWORD=%(password)s
+        dropdb -U %(user)s %(dbname)s_copia
+        createdb -U %(user)s -T %(dbname)s %(dbname)s_copia -O %(user)s
+        export PGPASSWORD=""" % {'user': user, 'password': password, 'dbname': dbname}, shell=True)
+    process.wait()
+
+    logging.info('Start server: %s' % dbname)
+    os.system('/etc/init.d/%s restart %s' % (erp, server))
+   
+    try:
+        logging.info('Dissable crons copy: %s_copia' % dbname)
+        conn = connect("dbname=%s_copia user=%s password=%s port=%s" % (dbname, user, password, port))
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM ir_cron WHERE active=True")
+        rows = cur.fetchall()
+        for row in rows:
+            cur.execute("UPDATE ir_cron SET active = False WHERE id = %s" % row[0])
+            conn.commit()
+
+        cur.close()
+        conn.close()
+    except:
+        logging.error('Dissable crons copy db: %s_copia' % dbname)
+        pass
+
+def parse_arguments(arguments):
+    parser = optparse.OptionParser(usage='erpdbcopy.py [options]', version=version.VERSION)
+    parser.add_option("-s", "--server", dest="server")
+    parser.add_option("-u", "--user", dest="user")
+    parser.add_option("-p", "--password", dest="password")
+    parser.add_option("-P", "--port", dest="port")
+    parser.add_option("-d", "--dbname", dest="dbname")
+    parser.add_option("-e", "--erp", dest="erp")
+    (opt, _) = parser.parse_args(arguments)
+
+    logging.basicConfig(format='%(asctime)s %(message)s', 
+        filename=LOG, level=logging.INFO)
+
+    if not opt.user:
+        logging.info('Option user')
+        exit()
+    if not opt.password:
+        logging.info('Option password')
+        exit()
+    if not opt.dbname:
+        logging.info('Option dbname')
+        exit()
+
+    return opt
+
+if __name__ == "__main__":
+    options = parse_arguments(sys.argv)
+
+    server = options.server
+    if not server:
+        server = options.dbname
+
+    port = options.port
+    if port is None:
+        port = 5432
+
+    erp = options.erp
+    if erp is None:
+        erp = 'trytond'
+
+    create_db_copy(server=server, user=options.user, password=options.password, 
+        dbname=options.dbname, port=port, erp=erp)
+
