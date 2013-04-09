@@ -11,37 +11,46 @@ from erpdbcopy import version
 
 LOG = '/var/log/erpdbcopy.log'
 
-def create_db_copy(server, user, password, dbname, port=5432, erp='trytond'):
-    """Create new database_copia"""
+def psql_version():
+    """Get PSQL version"""
+    psql_version = os.popen('psql --version',"r")
+    version = psql_version.readline().split( )[2]
+    return version
 
-    logging.basicConfig(format='%(asctime)s %(message)s', 
-        filename=LOG, level=logging.INFO)
+def create_db_copy(user, password, dbname, port=5432):
+    """Create new database_test"""
 
     logging.basicConfig(format='%(asctime)s %(message)s', 
         filename=LOG, level=logging.INFO)
 
     logging.info('Start copy database: %s' % dbname)
 
-    logging.info('Stop jasper server: %s' % dbname)
-    os.system("kill -9 `ps -ef | grep 'jasperreports' | grep 'JasperServer' | grep '8090' | awk {'print $2'}`")
-
-    logging.info('Stop server: %s' % dbname)
-    os.system('/etc/init.d/%s stop %s' % (erp, server))
-
     logging.info('Create db copy: %s' % dbname)
-    process = subprocess.Popen("""
-        export PGPASSWORD=%(password)s
-        dropdb -U %(user)s %(dbname)s_copia
-        createdb -U %(user)s -T %(dbname)s %(dbname)s_copia -O %(user)s
-        export PGPASSWORD=""" % {'user': user, 'password': password, 'dbname': dbname}, shell=True)
-    process.wait()
 
-    logging.info('Start server: %s' % dbname)
-    os.system('/etc/init.d/%s restart %s' % (erp, server))
-   
+    version = psql_version()
+
+    if version < '9.2':
+        process = subprocess.Popen("""
+            export PGPASSWORD=%(password)s
+            psql %(dbname)s -U %(user)s --quiet -c "select pg_terminate_backend(procpid) from pg_stat_activity where procpid <> pg_backend_pid( ) and datname='%(dbname)s'"
+            psql %(dbname)s_test -U %(user)s --quiet -c "select pg_terminate_backend(procpid) from pg_stat_activity where procpid <> pg_backend_pid( ) and datname='%(dbname)s_test'"
+            dropdb -U %(user)s %(dbname)s_test
+            createdb -U %(user)s -T %(dbname)s %(dbname)s_test -O %(user)s
+            export PGPASSWORD=""" % {'user': user, 'password': password, 'dbname': dbname}, shell=True)
+        process.wait()
+    else:
+        process = subprocess.Popen("""
+            export PGPASSWORD=%(password)s
+            psql %(dbname)s -U %(user)s --quiet -c "select pg_terminate_backend(pid) from pg_stat_activity where procpid <> pg_backend_pid( ) and datname='%(dbname)s'"
+            psql %(dbname)s_test -U %(user)s --quiet -c "select pg_terminate_backend(pid) from pg_stat_activity where procpid <> pg_backend_pid( ) and datname='%(dbname)s_test'"
+            dropdb -U %(user)s %(dbname)s_test
+            createdb -U %(user)s -T %(dbname)s %(dbname)s_test -O %(user)s
+            export PGPASSWORD=""" % {'user': user, 'password': password, 'dbname': dbname}, shell=True)
+        process.wait()
+
     try:
-        logging.info('Dissable crons copy: %s_copia' % dbname)
-        conn = connect("dbname=%s_copia user=%s password=%s port=%s" % (dbname, user, password, port))
+        logging.info('Dissable crons copy: %s_test' % dbname)
+        conn = connect("dbname=%s_test user=%s password=%s port=%s" % (dbname, user, password, port))
         cur = conn.cursor()
         cur.execute("SELECT id FROM ir_cron WHERE active=True")
         rows = cur.fetchall()
@@ -52,17 +61,15 @@ def create_db_copy(server, user, password, dbname, port=5432, erp='trytond'):
         cur.close()
         conn.close()
     except:
-        logging.error('Dissable crons copy db: %s_copia' % dbname)
+        logging.error('Dissable crons copy db: %s_test' % dbname)
         pass
 
 def parse_arguments(arguments):
     parser = optparse.OptionParser(usage='erpdbcopy.py [options]', version=version.VERSION)
-    parser.add_option("-s", "--server", dest="server")
     parser.add_option("-u", "--user", dest="user")
     parser.add_option("-p", "--password", dest="password")
     parser.add_option("-P", "--port", dest="port")
     parser.add_option("-d", "--dbname", dest="dbname")
-    parser.add_option("-e", "--erp", dest="erp")
     (opt, _) = parser.parse_args(arguments)
 
     logging.basicConfig(format='%(asctime)s %(message)s', 
@@ -83,18 +90,10 @@ def parse_arguments(arguments):
 if __name__ == "__main__":
     options = parse_arguments(sys.argv)
 
-    server = options.server
-    if not server:
-        server = options.dbname
-
     port = options.port
     if port is None:
         port = 5432
 
-    erp = options.erp
-    if erp is None:
-        erp = 'trytond'
-
-    create_db_copy(server=server, user=options.user, password=options.password, 
-        dbname=options.dbname, port=port, erp=erp)
+    create_db_copy(user=options.user, password=options.password, 
+        dbname=options.dbname, port=port)
 

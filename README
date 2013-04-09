@@ -1,7 +1,7 @@
 ERP DB Copy
 ===========
 
-Clone a Tryton or OpenERP database to new database (add _copia).
+Clone a Tryton or OpenERP database to new database (add _test) for PostgreSQL
 
 Installing
 ----------
@@ -30,14 +30,12 @@ See COPYRIGHT
 Example to use
 --------------
 
-    $ erpdbcopy -u user -p password -d dbname -s server -e trytond
-
-Server option is optional. If don't use it, get name from dbname
+    $ erpdbcopy -u user -p password -d dbname
 
 Example crontab
 ---------------
 
-    30 1 * * * /usr/local/bin/erpdbcopy -u user -p password -d dbname -s server -e trytond
+    30 1 * * * /usr/local/bin/erpdbcopy -u user -p password -d dbname
 
 Log file
 --------
