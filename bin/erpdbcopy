@@ -31,20 +31,28 @@ def create_db_copy(user, password, dbname, port=5432):
 
     if version < '9.2':
         process = subprocess.Popen("""
+            export PGPASSWORD="erpdbcopy"
+            psql postgres -U erpdbcopy --quiet -c "alter user %(user)s with superuser"
             export PGPASSWORD=%(password)s
             psql %(dbname)s -U %(user)s --quiet -c "select pg_terminate_backend(procpid) from pg_stat_activity where procpid <> pg_backend_pid( ) and datname='%(dbname)s'"
             psql %(dbname)s_test -U %(user)s --quiet -c "select pg_terminate_backend(procpid) from pg_stat_activity where procpid <> pg_backend_pid( ) and datname='%(dbname)s_test'"
             dropdb -U %(user)s %(dbname)s_test
             createdb -U %(user)s -T %(dbname)s %(dbname)s_test -O %(user)s
+            export PGPASSWORD="erpdbcopy"
+            psql postgres -U erpdbcopy --quiet -c "alter user %(user)s with nosuperuser"
             export PGPASSWORD=""" % {'user': user, 'password': password, 'dbname': dbname}, shell=True)
         process.wait()
     else:
         process = subprocess.Popen("""
+            export PGPASSWORD="erpdbcopy"
+            psql postgres -U erpdbcopy --quiet -c "alter user %(user)s with superuser"
             export PGPASSWORD=%(password)s
             psql %(dbname)s -U %(user)s --quiet -c "select pg_terminate_backend(pid) from pg_stat_activity where procpid <> pg_backend_pid( ) and datname='%(dbname)s'"
             psql %(dbname)s_test -U %(user)s --quiet -c "select pg_terminate_backend(pid) from pg_stat_activity where procpid <> pg_backend_pid( ) and datname='%(dbname)s_test'"
             dropdb -U %(user)s %(dbname)s_test
             createdb -U %(user)s -T %(dbname)s %(dbname)s_test -O %(user)s
+            export PGPASSWORD="erpdbcopy"
+            psql postgres -U erpdbcopy --quiet -c "alter user %(user)s with nosuperuser"
             export PGPASSWORD=""" % {'user': user, 'password': password, 'dbname': dbname}, shell=True)
         process.wait()
 

@@ -8,6 +8,17 @@ Installing
 
 See INSTALL
 
+Configuration
+-------------
+
+Create a user in your postgres:
+
+* Name: erpdbcopy
+* Password: erpdbcopy
+* Superuser: Yes
+
+See INSTALL
+
 Package Contents
 ----------------
 
